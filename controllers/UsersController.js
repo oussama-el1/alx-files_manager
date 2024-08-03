@@ -15,15 +15,18 @@ class UsersController {
         return res.status(400).json({ error: 'Missing password' });
       }
 
-      const existUser = await dbClient.existUser(email);
-      if (existUser) {
+      const userExists = await dbClient.existUser(email);
+      if (userExists) {
         return res.status(400).json({ error: 'Already exist' });
       }
 
       const hashedPassword = crypto.createHash('sha1').update(password).digest('hex');
+
       const result = await dbClient.addUser(email, hashedPassword);
-      res.json({ id: result.insertedId, email });
+
+      res.status(201).json({ id: result.insertedId, email });
     } catch (err) {
+      console.error('Error:', err);
       res.status(500).json({ error: 'An error occurred while adding the user.' });
     }
   }

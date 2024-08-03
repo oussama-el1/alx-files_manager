@@ -1,41 +1,51 @@
-/* eslint-disable consistent-return */
-const crypto = require('crypto');
-const dbClient = require('../utils/db');
+const { MongoClient } = require('mongodb');
 
-class UsersController {
-  static async postNew(req, res) {
+const { env } = process;
+
+class DBClient {
+  constructor() {
+    const host = env.DB_HOST || 'localhost';
+    const port = env.DB_PORT || 27017;
+    const database = env.DB_DATABASE || 'files_manager';
+
+    this.client = new MongoClient(`mongodb://${host}:${port}`, { useUnifiedTopology: true });
+    this.dbName = database;
+
+    this.client.connect().catch((err) => {
+      console.error('connection error [mongodb]: ', err);
+    });
+  }
+
+  isAlive() {
+    return this.client.isConnected();
+  }
+
+  async nbUsers() {
+    return this.client.db(this.dbName).collection('users').countDocuments();
+  }
+
+  async nbFiles() {
+    return this.client.db(this.dbName).collection('files').countDocuments();
+  }
+
+  db() {
+    return this.client.db(this.dbName);
+  }
+
+  async existUser(useremail) {
+    return this.db().collection('users').findOne({ email: useremail });
+  }
+
+  // eslint-disable-next-line consistent-return
+  async addUser(email, password) {
     try {
-      const { email, password } = req.body;
-
-      // Check if email is provided
-      if (!email) {
-        return res.status(400).json({ error: 'Missing email' });
-      }
-
-      // Check if password is provided
-      if (!password) {
-        return res.status(400).json({ error: 'Missing password' });
-      }
-
-      // Check if user already exists
-      const userExists = await dbClient.existUser(email);
-      if (userExists) {
-        return res.status(400).json({ error: 'Already exist' });
-      }
-
-      // Hash the password
-      const hashedPassword = crypto.createHash('sha1').update(password).digest('hex');
-
-      // Add new user to the database
-      const result = await dbClient.addUser(email, hashedPassword);
-
-      // Respond with the new user's ID and email and status code 201
-      res.status(201).json({ id: result.insertedId, email });
-    } catch (err) {
-      console.error('Error:', err);
-      res.status(500).json({ error: 'An error occurred while adding the user.' });
+      const newUser = { email, password };
+      return await this.db().collection('users').insertOne(newUser);
+    } catch (error) {
+      console.error('Error inserting user:', error);
     }
   }
 }
 
-module.exports = UsersController;
+const dbClient = new DBClient();
+module.exports = dbClient;
