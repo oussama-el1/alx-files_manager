@@ -27,6 +27,24 @@ class DBClient {
   async nbFiles() {
     return this.client.db(this.dbName).collection('files').countDocuments();
   }
+
+  db() {
+    return this.client.db(this.dbName);
+  }
+
+  async existUser(useremail) {
+    return this.db().collection('users').findOne({ email: useremail });
+  }
+
+  // eslint-disable-next-line consistent-return
+  async addUser(email, password) {
+    try {
+      const newUser = { email, password };
+      return await this.db().collection('users').insertOne(newUser);
+    } catch (error) {
+      console.error('Error inserting user:', error);
+    }
+  }
 }
 
 const dbClient = new DBClient();
