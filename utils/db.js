@@ -1,4 +1,4 @@
-const { MongoClient } = require('mongodb');
+const { MongoClient, ObjectId } = require('mongodb');
 
 const { env } = process;
 
@@ -30,6 +30,10 @@ class DBClient {
 
   db() {
     return this.client.db(this.dbName);
+  }
+
+  async UserByid(userid) {
+    return this.db().collection('users').findOne({ _id: new ObjectId(userid) });
   }
 
   async existUser(useremail) {
