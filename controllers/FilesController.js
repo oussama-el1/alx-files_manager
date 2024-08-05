@@ -99,12 +99,12 @@ class FilesController {
     try {
       const xtoken = req.headers['x-token'];
       const UserId = await redisClient.get(`auth_${xtoken}`);
-      const user = await dbClient.UserByid(UserId);
 
+      // Check if user exists
+      const user = await dbClient.UserByid(UserId);
       if (!user) {
         return res.status(401).json({ error: 'Unauthorized' });
       }
-
       const Fileid = req.params.id;
       const File = await dbClient.FileByid(Fileid);
 
@@ -113,7 +113,7 @@ class FilesController {
       }
 
       return res.json({
-        id: File._id,
+        id: File._id.toString(),
         userId: File.userId,
         name: File.name,
         type: File.type,
@@ -122,6 +122,7 @@ class FilesController {
       });
     } catch (err) {
       console.error(err);
+      return res.status(500).json({ error: 'Internal Server Error' });
     }
   }
 
@@ -130,18 +131,19 @@ class FilesController {
     try {
       const xtoken = req.headers['x-token'];
       const UserId = await redisClient.get(`auth_${xtoken}`);
-      const user = await dbClient.UserByid(UserId);
 
+      const user = await dbClient.UserByid(UserId);
       if (!user) {
         return res.status(401).json({ error: 'Unauthorized' });
       }
 
       const { parentId = '0', page = 0 } = req.query;
-      const Files = await dbClient.GetFiles({ parentId }, page);
+      const Files = await dbClient.GetFiles({ parentId }, parseInt(page, 10));
 
       return res.json(Files);
     } catch (err) {
       console.error(err);
+      return res.status(500).json({ error: 'Internal Server Error' });
     }
   }
 }
