@@ -36,6 +36,10 @@ class DBClient {
     return this.db().collection('users').findOne({ _id: new ObjectId(userid) });
   }
 
+  async FileByid(fileid) {
+    return this.db().collection('files').findOne({ _id: new ObjectId(fileid) });
+  }
+
   async existUser(useremail) {
     return this.db().collection('users').findOne({ email: useremail });
   }
@@ -47,6 +51,26 @@ class DBClient {
       return await this.db().collection('users').insertOne(newUser);
     } catch (error) {
       console.error('Error inserting user:', error);
+    }
+  }
+
+  // eslint-disable-next-line consistent-return
+  async addFile(name, UserId, type, parentId, isPublic, localPath) {
+    try {
+      let newFile;
+
+      if (type === 'folder') {
+        newFile = {
+          UserId, name, type, isPublic, parentId,
+        };
+      } else {
+        newFile = {
+          UserId, name, type, isPublic, parentId, localPath,
+        };
+      }
+      return await this.db().collection('files').insertOne(newFile);
+    } catch (error) {
+      console.error('Error inserting File:', error);
     }
   }
 }
