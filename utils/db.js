@@ -73,6 +73,30 @@ class DBClient {
       console.error('Error inserting File:', error);
     }
   }
+
+  async GetFiles(query, page) {
+    const skip = page * 20;
+
+    const aggregationPipeline = [
+      { $match: query },
+      { $skip: skip },
+      { $limit: 20 },
+      { $addFields: { id: '$_id' } },
+      {
+        $project: {
+          _id: 0,
+          id: 1,
+          userId: 1,
+          name: 1,
+          type: 1,
+          isPublic: 1,
+          parentId: 1,
+        },
+      },
+    ];
+
+    return this.db().collection('files').aggregate(aggregationPipeline).toArray();
+  }
 }
 
 const dbClient = new DBClient();

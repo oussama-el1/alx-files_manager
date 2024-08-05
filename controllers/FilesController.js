@@ -29,7 +29,7 @@ class FilesController {
       }
 
       const {
-        name, type, data, parentId = 0, isPublic = false,
+        name, type, data, parentId = '0', isPublic = false,
       } = req.body;
 
       if (!name) {
@@ -44,7 +44,7 @@ class FilesController {
         return res.status(400).json({ error: 'Missing data' });
       }
 
-      if (parentId) {
+      if (parentId !== '0') {
         const parentFile = await dbClient.FileByid(parentId);
         if (!parentFile) {
           return res.status(400).json({ error: 'Parent not found' });
@@ -91,6 +91,57 @@ class FilesController {
     } catch (error) {
       console.error('Internal server error: ', error);
       return res.status(500).json({ error: 'Internal server error' });
+    }
+  }
+
+  // eslint-disable-next-line consistent-return
+  static async getShow(req, res) {
+    try {
+      const xtoken = req.headers['x-token'];
+      const UserId = await redisClient.get(`auth_${xtoken}`);
+      const user = await dbClient.UserByid(UserId);
+
+      if (!user) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+
+      const Fileid = req.params.id;
+      const File = await dbClient.FileByid(Fileid);
+
+      if (!File || File.UserId.toString() !== UserId.toString()) {
+        return res.status(404).json({ error: 'Not found' });
+      }
+
+      return res.json({
+        id: File._id,
+        userId: File.userId,
+        name: File.name,
+        type: File.type,
+        isPublic: File.isPublic,
+        parentId: File.parentId,
+      });
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
+  // eslint-disable-next-line consistent-return
+  static async getIndex(req, res) {
+    try {
+      const xtoken = req.headers['x-token'];
+      const UserId = await redisClient.get(`auth_${xtoken}`);
+      const user = await dbClient.UserByid(UserId);
+
+      if (!user) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+
+      const { parentId = '0', page = 0 } = req.query;
+      const Files = await dbClient.GetFiles({ parentId }, page);
+
+      return res.json(Files);
+    } catch (err) {
+      console.error(err);
     }
   }
 }
