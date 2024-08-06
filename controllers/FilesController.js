@@ -126,7 +126,7 @@ class FilesController {
 
       return res.status(200).json({
         id: File._id.toString(),
-        userId: File.userId,
+        userId: File.UserId,
         name: File.name,
         type: File.type,
         isPublic: File.isPublic,
@@ -184,7 +184,7 @@ class FilesController {
     await dbClient.UpdateFile(Fileid, true);
     return res.status(200).json({
       id: File._id.toString(),
-      userId: File.userId,
+      userId: File.UserId,
       name: File.name,
       type: File.type,
       isPublic: true,
@@ -212,7 +212,7 @@ class FilesController {
     await dbClient.UpdateFile(Fileid, false);
     return res.status(200).json({
       id: File._id.toString(),
-      userId: File.userId,
+      userId: File.UserId,
       name: File.name,
       type: File.type,
       isPublic: false,
