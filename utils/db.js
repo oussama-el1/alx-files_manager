@@ -78,7 +78,6 @@ class DBClient {
     const skip = page * 20;
 
     const aggregationPipeline = [
-      { $match: query },
       { $skip: skip },
       { $limit: 20 },
       { $addFields: { id: '$_id' } },
@@ -95,7 +94,15 @@ class DBClient {
       },
     ];
 
+    if (Object.keys(query).length > 0) {
+      aggregationPipeline.push({ $match: query });
+    }
+
     return this.db().collection('files').aggregate(aggregationPipeline).toArray();
+  }
+
+  async UpdateFile(FileId, statu) {
+    return this.db().collection('files').updateOne({ _id: new ObjectId(FileId) }, { $set: { isPublic: statu } });
   }
 }
 
