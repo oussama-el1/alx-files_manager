@@ -55,17 +55,17 @@ class DBClient {
   }
 
   // eslint-disable-next-line consistent-return
-  async addFile(name, UserId, type, parentId, isPublic, localPath) {
+  async addFile(name, userId, type, parentId, isPublic, localPath) {
     try {
       let newFile;
 
       if (type === 'folder') {
         newFile = {
-          UserId, name, type, isPublic, parentId,
+          userId, name, type, isPublic, parentId,
         };
       } else {
         newFile = {
-          UserId, name, type, isPublic, parentId, localPath,
+          userId, name, type, isPublic, parentId, localPath,
         };
       }
       return await this.db().collection('files').insertOne(newFile);

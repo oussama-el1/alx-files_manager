@@ -1,6 +1,7 @@
 const { v4: uuid4 } = require('uuid');
 const fs = require('fs');
 const mime = require('mime-types');
+const fileQueue = require('../utils/queue');
 const dbClient = require('../utils/db');
 const redisClient = require('../utils/redis');
 
@@ -12,29 +13,18 @@ const createDirIfNotexists = async (dir) => {
   }
 };
 
-const checkFileExist = (file) => fs.existsSync(file);
-
 const WriteDataToFile = async (dir, file, Base64Data) => {
   await createDirIfNotexists(dir);
   const binaryData = Buffer.from(Base64Data, 'base64');
   await fs.promises.writeFile(file, binaryData);
 };
 
-const readFromFile = async (file) => {
-  try {
-    const data = await fs.promises.readFile(file);
-    return data;
-  } catch (error) {
-    throw new Error('Error reading file');
-  }
-};
-
 class FilesController {
   static async postUpload(req, res) {
     try {
       const xtoken = req.headers['x-token'];
-      const UserId = await redisClient.get(`auth_${xtoken}`);
-      const user = await dbClient.UserByid(UserId);
+      const userId = await redisClient.get(`auth_${xtoken}`);
+      const user = await dbClient.UserByid(userId);
 
       if (!user) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -67,10 +57,10 @@ class FilesController {
       }
 
       if (type === 'folder') {
-        const newFolder = await dbClient.addFile(name, UserId, type, parentId, isPublic, null);
+        const newFolder = await dbClient.addFile(name, userId, type, parentId, isPublic, null);
         return res.status(201).json({
           id: newFolder.insertedId,
-          userId: UserId,
+          userId,
           name,
           type,
           isPublic,
@@ -90,10 +80,17 @@ class FilesController {
         return res.status(500).json({ error: 'Error creating file' });
       }
 
-      const newFile = await dbClient.addFile(name, UserId, type, parentId, isPublic, localPath);
+      const newFile = await dbClient.addFile(name, userId, type, parentId, isPublic, localPath);
+      try {
+        await fileQueue.add({ userId, fileId: newFile.insertedId });
+      } catch (err) {
+        console.error('Error creating file: ', err);
+        return res.status(500).json({ error: 'Error creating file' });
+      }
+
       return res.status(201).json({
         id: newFile.insertedId,
-        userId: UserId,
+        userId,
         name,
         type,
         isPublic,
@@ -109,10 +106,10 @@ class FilesController {
   static async getShow(req, res) {
     try {
       const xtoken = req.headers['x-token'];
-      const UserId = await redisClient.get(`auth_${xtoken}`);
+      const userId = await redisClient.get(`auth_${xtoken}`);
 
       // Check if user exists
-      const user = await dbClient.UserByid(UserId);
+      const user = await dbClient.UserByid(userId);
       if (!user) {
         return res.status(401).json({ error: 'Unauthorized' });
       }
@@ -120,13 +117,13 @@ class FilesController {
       const Fileid = req.params.id;
       const File = await dbClient.FileByid(Fileid);
 
-      if (!File || File.UserId.toString() !== UserId.toString()) {
+      if (!File || File.userId.toString() !== userId.toString()) {
         return res.status(404).json({ error: 'Not found' });
       }
 
       return res.status(200).json({
         id: File._id.toString(),
-        userId: File.UserId,
+        userId: File.userId,
         name: File.name,
         type: File.type,
         isPublic: File.isPublic,
@@ -142,9 +139,9 @@ class FilesController {
   static async getIndex(req, res) {
     try {
       const xtoken = req.headers['x-token'];
-      const UserId = await redisClient.get(`auth_${xtoken}`);
+      const userId = await redisClient.get(`auth_${xtoken}`);
 
-      const user = await dbClient.UserByid(UserId);
+      const user = await dbClient.UserByid(userId);
       if (!user) {
         return res.status(401).json({ error: 'Unauthorized' });
       }
@@ -166,10 +163,10 @@ class FilesController {
 
   static async putPublish(req, res) {
     const xtoken = req.headers['x-token'];
-    const UserId = await redisClient.get(`auth_${xtoken}`);
+    const userId = await redisClient.get(`auth_${xtoken}`);
 
     // Check if user exists
-    const user = await dbClient.UserByid(UserId);
+    const user = await dbClient.UserByid(userId);
     if (!user) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
@@ -177,14 +174,14 @@ class FilesController {
     const Fileid = req.params.id;
     const File = await dbClient.FileByid(Fileid);
 
-    if (!File || File.UserId.toString() !== UserId.toString()) {
+    if (!File || File.userId.toString() !== userId.toString()) {
       return res.status(404).json({ error: 'Not found' });
     }
 
     await dbClient.UpdateFile(Fileid, true);
     return res.status(200).json({
       id: File._id.toString(),
-      userId: File.UserId,
+      userId: File.userId,
       name: File.name,
       type: File.type,
       isPublic: true,
@@ -194,10 +191,10 @@ class FilesController {
 
   static async putUnpublish(req, res) {
     const xtoken = req.headers['x-token'];
-    const UserId = await redisClient.get(`auth_${xtoken}`);
+    const userId = await redisClient.get(`auth_${xtoken}`);
 
     // Check if user exists
-    const user = await dbClient.UserByid(UserId);
+    const user = await dbClient.UserByid(userId);
     if (!user) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
@@ -205,14 +202,14 @@ class FilesController {
     const Fileid = req.params.id;
     const File = await dbClient.FileByid(Fileid);
 
-    if (!File || File.UserId.toString() !== UserId.toString()) {
+    if (!File || File.userId.toString() !== userId.toString()) {
       return res.status(404).json({ error: 'Not found' });
     }
 
     await dbClient.UpdateFile(Fileid, false);
     return res.status(200).json({
       id: File._id.toString(),
-      userId: File.UserId,
+      userId: File.userId,
       name: File.name,
       type: File.type,
       isPublic: false,
@@ -222,18 +219,12 @@ class FilesController {
 
   // eslint-disable-next-line consistent-return
   static async getFile(req, res) {
+    const fileId = req.params.id;
+    const size = parseInt(req.query.size, 10);
+
     try {
-      const fileId = req.params.id;
       const file = await dbClient.FileByid(fileId);
-
       if (!file) {
-        return res.status(404).json({ error: 'Not found' });
-      }
-
-      const xtoken = req.headers['x-token'];
-      const userId = await redisClient.get(`auth_${xtoken}`);
-
-      if (file.isPublic === false && userId !== file.UserId) {
         return res.status(404).json({ error: 'Not found' });
       }
 
@@ -241,16 +232,22 @@ class FilesController {
         return res.status(400).json({ error: 'A folder doesn\'t have content' });
       }
 
-      if (!checkFileExist(file.localPath)) {
+      const filePath = size
+        ? `${file.localPath}_${size}`
+        : file.localPath;
+
+      if (!fs.existsSync(filePath)) {
         return res.status(404).json({ error: 'Not found' });
       }
 
-      const data = await readFromFile(file.localPath);
-      const dataType = mime.lookup(file.name);
-      res.setHeader('Content-Type', dataType);
-      res.status(200).send(data.toString());
-    } catch (err) {
-      console.error('Internal server error: ', err);
+      // Read and return the file content
+      const data = fs.readFileSync(filePath);
+      const mimeType = mime.lookup(filePath);
+
+      res.setHeader('Content-Type', mimeType || 'application/octet-stream');
+      return res.status(200).send(data);
+    } catch (error) {
+      console.error('Error fetching file:', error);
       return res.status(500).json({ error: 'Internal Server Error' });
     }
   }
