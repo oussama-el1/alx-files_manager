@@ -5,84 +5,95 @@ const fileQueue = require('../utils/queue');
 const dbClient = require('../utils/db');
 const redisClient = require('../utils/redis');
 
+const AcceptedTypes = ['folder', 'file', 'image'];
+
+const createDirIfNotexists = async (dir) => {
+  if (!fs.existsSync(dir)) {
+    await fs.promises.mkdir(dir, { recursive: true });
+  }
+};
+
+const WriteDataToFile = async (dir, file, Base64Data) => {
+  await createDirIfNotexists(dir);
+  const binaryData = Buffer.from(Base64Data, 'base64');
+  await fs.promises.writeFile(file, binaryData);
+};
+
 class FilesController {
   static async postUpload(req, res) {
     try {
       const xtoken = req.headers['x-token'];
       const userId = await redisClient.get(`auth_${xtoken}`);
       const user = await dbClient.UserByid(userId);
-  
+
       if (!user) {
         return res.status(401).json({ error: 'Unauthorized' });
       }
-  
+
       const {
-        name, type, data, parentId = 0, isPublic = false,
+        name, type, data, parentId = '0', isPublic = false,
       } = req.body;
-  
+
       if (!name) {
         return res.status(400).json({ error: 'Missing name' });
       }
-  
-      if (!type || !['folder', 'file', 'image'].includes(type)) {
+
+      if (!type || !AcceptedTypes.includes(type)) {
         return res.status(400).json({ error: 'Missing type' });
       }
-  
+
       if (!data && type !== 'folder') {
         return res.status(400).json({ error: 'Missing data' });
       }
-  
-      if (parentId !== 0) {
+      if (parentId !== '0') {
         const parentFile = await dbClient.FileByid(parentId);
         if (!parentFile) {
           return res.status(400).json({ error: 'Parent not found' });
         }
+
         if (parentFile.type !== 'folder') {
           return res.status(400).json({ error: 'Parent is not a folder' });
         }
       }
-  
-      const isPublicBool = isPublic === 'true' || isPublic === true;
-  
+
       if (type === 'folder') {
-        const newFolder = await dbClient.addFile(name, userId, type, parentId, isPublicBool, null);
+        const newFolder = await dbClient.addFile(name, userId, type, parentId, isPublic, null);
         return res.status(201).json({
           id: newFolder.insertedId,
           userId,
           name,
           type,
-          isPublic: isPublicBool,
+          isPublic,
           parentId,
         });
       }
-  
+
       const FOLDER_PATH = process.env.FOLDER_PATH || '/tmp/files_manager';
-      await fs.promises.mkdir(FOLDER_PATH, { recursive: true });
-      
       const FILE_NAME = uuid4();
-      const localPath = path.join(FOLDER_PATH, FILE_NAME);
-  
+      const localPath = `${FOLDER_PATH}/${FILE_NAME}`;
+
       try {
-        await fs.promises.writeFile(localPath, Buffer.from(data, 'base64'));
+        await WriteDataToFile(FOLDER_PATH, localPath, data);
+        console.log('File Created successfully');
       } catch (err) {
         console.error('Error creating file: ', err);
         return res.status(500).json({ error: 'Error creating file' });
       }
-  
-      const newFile = await dbClient.addFile(name, userId, type, parentId, isPublicBool, localPath);
-      
+
+      const newFile = await dbClient.addFile(name, userId, type, parentId, isPublic, localPath);
       try {
         await fileQueue.add({ userId, fileId: newFile.insertedId });
       } catch (err) {
-        console.error('Error queuing file processing: ', err);
+        console.error('Error creating file: ', err);
+        return res.status(500).json({ error: 'Error creating file' });
       }
-  
+
       return res.status(201).json({
         id: newFile.insertedId,
         userId,
         name,
         type,
-        isPublic: isPublicBool,
+        isPublic,
         parentId,
       });
     } catch (error) {
