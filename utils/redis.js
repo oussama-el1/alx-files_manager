@@ -5,9 +5,6 @@ import { promisify } from 'util';
 class RedisClient {
   constructor() {
     this.client = createClient();
-    this.client.on('connect', () => {
-      // console.log('Redis client connected to the server');
-    });
     this.client.on('error', (err) => console.log(`Redis Error : ${err.message || err.toString()}`));
   }
 
@@ -22,7 +19,7 @@ class RedisClient {
       const value = await asynget(key);
       return value;
     } catch (err) {
-      console.console.error(`Error ${err.message || err.toString()} Redis while Get the key : ${key}`);
+      console.error(`Error ${err.message || err.toString()} Redis while Get the key : ${key}`);
     }
   }
 
@@ -32,7 +29,7 @@ class RedisClient {
     try {
       await asynset(key, expire, val);
     } catch (err) {
-      console.console.error(`Error ${err.message || err.toString()} Redis while SET the key : ${key}`);
+      console.error(`Error ${err.message || err.toString()} Redis while SET the key : ${key}`);
     }
   }
 
@@ -42,7 +39,7 @@ class RedisClient {
     try {
       await asyncdel(key);
     } catch (err) {
-      console.console.error(`Error ${err.message || err.toString()} Redis while DEL the key : ${key}`);
+      console.error(`Error ${err.message || err.toString()} Redis while DEL the key : ${key}`);
     }
   }
 }
