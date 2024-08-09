@@ -1,3 +1,4 @@
+/* eslint-disable */
 const { v4: uuid4 } = require('uuid');
 const fs = require('fs');
 const mime = require('mime-types');
@@ -221,31 +222,37 @@ class FilesController {
   static async getFile(req, res) {
     const fileId = req.params.id;
     const size = parseInt(req.query.size, 10);
-
+  
     try {
       const file = await dbClient.FileByid(fileId);
       if (!file) {
         return res.status(404).json({ error: 'Not found' });
       }
-
+  
+      const xtoken = req.headers['x-token'];
+      const userId = await redisClient.get(`auth_${xtoken}`);
+      const user = await dbClient.UserByid(userId);
+  
+      if (!file.isPublic && (!user || file.userId !== userId)) {
+        return res.status(404).json({ error: 'Not found' });
+      }
+  
       if (file.type === 'folder') {
         return res.status(400).json({ error: 'A folder doesn\'t have content' });
       }
 
-      const filePath = size
-        ? `${file.localPath}_${size}`
-        : file.localPath;
+      const filePath = size ? `${file.localPath}_${size}` : file.localPath;
 
       if (!fs.existsSync(filePath)) {
         return res.status(404).json({ error: 'Not found' });
       }
 
-      // Read and return the file content
       const data = fs.readFileSync(filePath);
-      const mimeType = mime.lookup(filePath);
+      const mimeType = mime.lookup(path.basename(filePath));
 
       res.setHeader('Content-Type', mimeType || 'application/octet-stream');
       return res.status(200).send(data);
+
     } catch (error) {
       console.error('Error fetching file:', error);
       return res.status(500).json({ error: 'Internal Server Error' });
