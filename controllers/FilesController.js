@@ -146,7 +146,7 @@ class FilesController {
         return res.status(401).json({ error: 'Unauthorized' });
       }
 
-      const { parentId = 0, page = 0 } = req.query;
+      const { parentId = 0, page = '0' } = req.query;
       let Files;
 
       if (parentId === 0) {
