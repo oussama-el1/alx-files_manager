@@ -146,19 +146,13 @@ class FilesController {
         return res.status(401).json({ error: 'Unauthorized' });
       }
 
-      const { parentId = 0 } = req.query;
-      let { page = 0 } = req.query;
+      const { parentId = 0, page = 0 } = req.query;
       let Files;
 
-      const pageNumber = parseInt(page, 10);
-      if (isNaN(pageNumber) || pageNumber < 0) {
-        page = 0;
-      }
-
       if (parentId === 0) {
-        Files = await dbClient.GetFiles({}, pageNumber);
+        Files = await dbClient.GetFiles({}, parseInt(page, 10));
       } else {
-        Files = await dbClient.GetFiles({ parentId }, pageNumber);
+        Files = await dbClient.GetFiles({ parentId }, parseInt(page, 10));
       }
       return res.json(Files);
     } catch (err) {
