@@ -22,6 +22,8 @@ module.exports = {
     'no-underscore-dangle': 'off',
     'no-console': 'off',
     'no-shadow': 'off',
+    'jest/no-conditional-expect': 'off',
+    'jest/max-expects': 'off',
     'no-restricted-syntax': [
       'error',
       'LabeledStatement',
