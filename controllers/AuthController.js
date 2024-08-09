@@ -26,6 +26,10 @@ class AuthController {
 
     const User = await dbClient.existUser(email);
 
+    if (!User) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
     if (User.password !== hashPassword(password)) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
